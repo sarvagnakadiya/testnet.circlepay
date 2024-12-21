@@ -71,18 +71,18 @@ app.transaction("/execute/:id", async (c) => {
     // same chain
     console.log("same chain tx");
     return c.contract({
-      abi: usdcAbi,
-      chainId: chainEip as (typeof allowedChainIds)[number],
-      functionName: "transferWithAuthorization",
-      args: [
-        txObj.sender,
-        txObj.receiver,
-        txObj.amount,
-        txObj.validAfter,
-        txObj.validBefore,
-        pad(validateAddress(txObj.nonce.toString())),
-        txObj.sign,
+      abi: [
+        {
+          inputs: [{ type: "uint256", name: "num" }],
+          name: "store",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
+      chainId: chainEip as (typeof allowedChainIds)[number],
+      functionName: "store",
+      args: [BigInt(5)],
       to: contractAddress as Address,
     });
   } else {

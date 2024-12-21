@@ -393,7 +393,7 @@ export default function NewPostTab() {
   return (
     <div className="min-h-screen bg-gradient-to-r from-indigo-50 via-sky-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-xl shadow-xl overflow-hidden">
+        <div className="bg-white rounded-xl shadow-xl ">
           <div className="px-6 py-8">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900">
