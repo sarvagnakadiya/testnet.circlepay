@@ -1,7 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Address, encodePacked, keccak256, PublicClient } from "viem";
-import { signTypedData, getChainId } from "@wagmi/core";
+import {
+  Address,
+  encodePacked,
+  keccak256,
+  PublicClient,
+  formatUnits,
+} from "viem";
+import { signTypedData, getChainId, readContract } from "@wagmi/core";
 import { config } from "@/app/utils/config";
 import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
 import { useAccount } from "wagmi";
@@ -19,9 +25,9 @@ import {
   Send,
 } from "lucide-react";
 import SelectWithIcons from "./SelectWithIcons";
+import usdcABI from "@/usdc.json";
 
 export default function NewPostTab() {
-  const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [value, setValue] = useState("");
   const [validAfter, setValidAfter] = useState<number | string>("");
@@ -35,6 +41,47 @@ export default function NewPostTab() {
   const [chainName, setChainName] = useState<string>("");
   const [receiversChainId, SetReceiversChainId] = useState<number>(0);
   const clientRef = useRef<PublicClient | null>(null);
+  const [usdcBalance, setUsdcBalance] = useState<string>("0");
+
+  const fetchUsdcBalance = async () => {
+    if (!address || !chainId) return;
+
+    try {
+      const usdcAddress = await getContractAddress(chainId as number);
+      console.log("usdcAddress", usdcAddress);
+      const balance = await readContract(config, {
+        address: usdcAddress as Address,
+        abi: usdcABI,
+        functionName: "balanceOf",
+        args: [address as `0x${string}`],
+      });
+
+      // USDC has 6 decimals
+      const formattedBalance = formatUnits(balance as bigint, 6);
+      setUsdcBalance(formattedBalance);
+    } catch (error) {
+      console.error("Error fetching USDC balance:", error);
+      setUsdcBalance("0");
+    }
+  };
+
+  useEffect(() => {
+    fetchUsdcBalance();
+    // Set up an interval to refresh the balance
+    const intervalId = setInterval(fetchUsdcBalance, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(intervalId);
+  }, [address, chainId]);
+
+  const addDays = (days: number): number => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return Math.floor(date.getTime() / 1000);
+  };
+
+  const addWeek = (): number => {
+    return addDays(7);
+  };
 
   useEffect(() => {
     if (chainId) {
@@ -86,7 +133,6 @@ export default function NewPostTab() {
 
     try {
       const theNonce = await generateNonce();
-      const validFrom = validateAddress(from);
       const validTo = validateAddress(to);
 
       const valueBigInt = BigInt(Math.round(Number(value) * 1_000_000));
@@ -120,8 +166,7 @@ export default function NewPostTab() {
         },
         primaryType: "TransferWithAuthorization",
         message: {
-          from: validFrom,
-          // to: validTo,
+          from: address as `0x${string}`,
           to: isCrossChain() ? CIRCLEPAY_BASE : validTo,
           value: valueBigInt,
           validAfter: validAfterTimestamp,
@@ -136,7 +181,7 @@ export default function NewPostTab() {
       try {
         const response = await axios.post("/api/initiateTransaction", {
           initiator: address,
-          sender: from,
+          sender: address,
           receiver: to,
           amount: BigInt(Math.round(Number(value) * 1_000_000)).toString(),
           validAfter: validAfterTimestamp.toString(),
@@ -170,7 +215,7 @@ export default function NewPostTab() {
 
   // Validation functions for each step
   const isStep1Valid = () => {
-    return from.trim() !== "" && to.trim() !== "";
+    return address && to.trim() !== "";
   };
 
   const isStep2Valid = () => {
@@ -209,17 +254,13 @@ export default function NewPostTab() {
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
-                From Address
+                Sending From
               </label>
               <div className="relative">
                 <Wallet className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  value={from}
-                  onChange={(e) => setFrom(e.target.value)}
-                  placeholder="0x..."
-                />
+                <div className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600">
+                  {address || "Connect Wallet"}
+                </div>
               </div>
             </div>
             <div className="space-y-2">
@@ -251,19 +292,30 @@ export default function NewPostTab() {
         return (
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Amount (USDC)
-              </label>
+              <div className="flex justify-between items-center">
+                <label className="block text-sm font-medium text-gray-700">
+                  Amount (USDC)
+                </label>
+                <div className="text-sm text-gray-500">
+                  Balance: {usdcBalance} USDC
+                </div>
+              </div>
               <div className="relative mt-2 rounded-md shadow-sm">
                 <input
                   type="number"
-                  className="w-full pl-3 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full pl-3 pr-20 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder="0.00"
                 />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <span className="text-gray-500 sm:text-sm">USDC</span>
+                <div className="absolute inset-y-0 right-0 flex items-center">
+                  <button
+                    onClick={() => setValue(usdcBalance)}
+                    className="mr-12 px-2 py-1 text-sm text-indigo-600 hover:text-indigo-800"
+                  >
+                    Max
+                  </button>
+                  <span className="pr-3 text-gray-500 sm:text-sm">USDC</span>
                 </div>
               </div>
             </div>
@@ -315,6 +367,46 @@ export default function NewPostTab() {
                       disabled={isValidAfterZero}
                     />
                   </div>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() =>
+                        setValidAfter(Math.floor(Date.now() / 1000))
+                      }
+                      className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                    >
+                      Now
+                    </button>
+                    <button
+                      onClick={() => setValidAfter(addDays(1))}
+                      className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                    >
+                      1 Day
+                    </button>
+                    <button
+                      onClick={() => setValidAfter(addDays(2))}
+                      className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                    >
+                      2 Days
+                    </button>
+                    <button
+                      onClick={() => setValidAfter(addDays(3))}
+                      className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                    >
+                      3 Days
+                    </button>
+                    <button
+                      onClick={() => setValidAfter(addDays(14))}
+                      className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                    >
+                      2 Week
+                    </button>
+                    <button
+                      onClick={() => setValidAfter(addDays(30))}
+                      className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                    >
+                      1 Month
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -339,6 +431,44 @@ export default function NewPostTab() {
                     }
                   />
                 </div>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => setValidBefore(addDays(1))}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                  >
+                    1 Day
+                  </button>
+                  <button
+                    onClick={() => setValidBefore(addDays(2))}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                  >
+                    2 Days
+                  </button>
+                  <button
+                    onClick={() => setValidBefore(addDays(3))}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                  >
+                    3 Days
+                  </button>
+                  <button
+                    onClick={() => setValidBefore(addWeek())}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                  >
+                    1 Week
+                  </button>
+                  <button
+                    onClick={() => setValidBefore(addDays(14))}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                  >
+                    2 Week
+                  </button>
+                  <button
+                    onClick={() => setValidBefore(addDays(30))}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+                  >
+                    1 Month
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -349,7 +479,7 @@ export default function NewPostTab() {
             <div className="bg-gray-50 rounded-lg p-6 space-y-4">
               <div className="flex justify-between">
                 <span className="text-gray-600">From</span>
-                <span className="text-gray-900 font-medium">{from}</span>
+                <span className="text-gray-900 font-medium">{address}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">To</span>

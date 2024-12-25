@@ -32,19 +32,21 @@ app.frame("/:id", async (c) => {
   const id = c.req.param();
   const txObj = await fetchTransactions(id.id);
 
-  // Encode transaction data for URL
-  const txData = Buffer.from(
-    JSON.stringify({
-      sender: txObj.sender,
-      receiver: txObj.receiver,
-      amount: txObj.amount,
-      chainId: txObj.chainId,
-      destinationChain: txObj.destinationChain,
-    })
-  ).toString("base64");
+  const params = {
+    sender: txObj.sender,
+    receiver: txObj.receiver,
+    amount: txObj.amount,
+    chainId: txObj.chainId,
+    destinationChain: txObj.destinationChain,
+    validAfter: txObj.validAfter,
+    validBefore: txObj.validBefore,
+  };
+
+  const jsonParams = JSON.stringify(params);
+  const base64Params = Buffer.from(jsonParams).toString("base64");
 
   return c.res({
-    image: `${process.env.NEXT_PUBLIC_BASE_URL}/api/generateImage?id=${id.id}`,
+    image: `${process.env.NEXT_PUBLIC_BASE_URL}/api/generateImage?params=${base64Params}`,
     intents: [
       <Button.Transaction target={`/execute/${id.id}`}>
         Execute
