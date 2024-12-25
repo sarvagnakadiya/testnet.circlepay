@@ -28,6 +28,34 @@ export async function GET(request: NextRequest) {
     const formatAddress = (address: string) =>
       `${address.slice(0, 6)}...${address.slice(-4)}`;
 
+    // Chain images with absolute URLs
+    const chainImages: { [key: string]: string } = {
+      "11155111": new URL("/images/ethereum.svg", request.url).toString(),
+      "80001": new URL("/images/polygon.svg", request.url).toString(),
+      "421614": new URL("/images/arbitrum.svg", request.url).toString(),
+      "84532": new URL("/images/base.svg", request.url).toString(),
+    };
+
+    // Fetch all required images first
+    const sourceChainImage = await fetch(chainImages[params.chainId])
+      .then((res) => res.arrayBuffer())
+      .then(
+        (buffer) =>
+          `data:image/svg+xml;base64,${Buffer.from(buffer).toString("base64")}`
+      );
+
+    let destinationChainImage;
+    if (params.chainId !== params.destinationChain) {
+      destinationChainImage = await fetch(chainImages[params.destinationChain])
+        .then((res) => res.arrayBuffer())
+        .then(
+          (buffer) =>
+            `data:image/svg+xml;base64,${Buffer.from(buffer).toString(
+              "base64"
+            )}`
+        );
+    }
+
     const imageResponse = new ImageResponse(
       (
         <div
@@ -102,6 +130,9 @@ export async function GET(request: NextRequest) {
             >
               <div
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                   padding: "8px 16px",
                   backgroundColor: "rgba(59, 130, 246, 0.1)",
                   border: "1px solid rgba(59, 130, 246, 0.2)",
@@ -109,14 +140,20 @@ export async function GET(request: NextRequest) {
                   color: "#60a5fa",
                 }}
               >
+                <img
+                  src={sourceChainImage}
+                  alt={getChainName(params.chainId)}
+                  width={24}
+                  height={24}
+                />
                 {getChainName(params.chainId)}
               </div>
               {params.chainId !== params.destinationChain && (
                 <>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                     <path
                       d="M5 12h14M13 5l7 7-7 7"
-                      stroke="#64748b"
+                      stroke="#60a5fa"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -124,6 +161,9 @@ export async function GET(request: NextRequest) {
                   </svg>
                   <div
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
                       padding: "8px 16px",
                       backgroundColor: "rgba(59, 130, 246, 0.1)",
                       border: "1px solid rgba(59, 130, 246, 0.2)",
@@ -131,6 +171,12 @@ export async function GET(request: NextRequest) {
                       color: "#60a5fa",
                     }}
                   >
+                    <img
+                      src={destinationChainImage}
+                      alt={getChainName(params.destinationChain)}
+                      width={24}
+                      height={24}
+                    />
                     {getChainName(params.destinationChain)}
                   </div>
                 </>
@@ -142,62 +188,99 @@ export async function GET(request: NextRequest) {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "16px",
-                padding: "24px",
+                gap: "24px",
+                padding: "32px",
                 backgroundColor: "rgba(255, 255, 255, 0.05)",
-                borderRadius: "12px",
+                borderRadius: "16px",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
               }}
             >
+              {/* From -> To Flow */}
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
                   alignItems: "center",
+                  gap: "16px",
+                  position: "relative",
                 }}
               >
-                <span style={{ color: "#94a3b8" }}>From</span>
-                <span style={{ color: "#e2e8f0" }}>
-                  {formatAddress(params.sender)}
-                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                    flex: 1,
+                  }}
+                >
+                  <span style={{ color: "#94a3b8", fontSize: "14px" }}>
+                    From
+                  </span>
+                  <span
+                    style={{
+                      color: "#e2e8f0",
+                      backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      padding: "12px 20px",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    {formatAddress(params.sender)}
+                  </span>
+                </div>
+
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M5 12h14M13 5l7 7-7 7"
+                    stroke="#60a5fa"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                    flex: 1,
+                  }}
+                >
+                  <span style={{ color: "#94a3b8", fontSize: "14px" }}>To</span>
+                  <span
+                    style={{
+                      color: "#e2e8f0",
+                      backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      padding: "12px 20px",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    {formatAddress(params.receiver)}
+                  </span>
+                </div>
               </div>
+
+              {/* Expiry */}
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
                   alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  padding: "12px 20px",
+                  borderRadius: "12px",
                 }}
               >
-                <span style={{ color: "#94a3b8" }}>To</span>
-                <span style={{ color: "#e2e8f0" }}>
-                  {formatAddress(params.receiver)}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <span style={{ color: "#94a3b8" }}>Valid After</span>
-                <span style={{ color: "#e2e8f0" }}>
-                  {params.validAfter === "0"
-                    ? "Immediately"
-                    : new Date(
-                        Number(params.validAfter) * 1000
-                      ).toLocaleString()}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <span style={{ color: "#94a3b8" }}>Valid Before</span>
-                <span style={{ color: "#e2e8f0" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    stroke="#ef4444"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span style={{ color: "#ef4444" }}>
+                  Expires:{" "}
                   {new Date(Number(params.validBefore) * 1000).toLocaleString()}
                 </span>
               </div>
