@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Address, encodePacked, keccak256, PublicClient } from "viem";
 import { signTypedData, getChainId } from "@wagmi/core";
 import { config } from "@/app/utils/config";
-import { initializeClient } from "@/app/utils/publicClient";
+import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
 import { useAccount } from "wagmi";
 import axios from "axios";
 import {
@@ -31,31 +31,29 @@ export default function NewPostTab() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
   const [signature, setSignature] = useState("");
-  const { address, isConnected } = useAccount();
-  const [chainId, setChainId] = useState<number>(0);
-  const [chainName, setChainName] = useState<string>("base");
-  const [receiversChainId, SetReceiversChainId] = useState<number>(84532);
+  const { address, isConnected, chainId } = useAccount();
+  const [chainName, setChainName] = useState<string>("");
+  const [receiversChainId, SetReceiversChainId] = useState<number>(0);
   const clientRef = useRef<PublicClient | null>(null);
 
   useEffect(() => {
-    const setupClient = async () => {
-      try {
-        const currentChainId = getChainId(config);
-        setChainId(currentChainId);
-        const newClient = initializeClient(currentChainId);
-        clientRef.current = newClient as PublicClient;
-      } catch (error) {
-        console.error("Error initializing client:", error);
-      }
-    };
-
-    setupClient();
-  }, []);
+    if (chainId) {
+      console.log(chainId);
+      const newClient = initializeClient(chainId as AllowedChainIds);
+      clientRef.current = newClient as PublicClient;
+      SetReceiversChainId(chainId);
+    }
+  }, [chainId]);
 
   const isCrossChain = () => {
+    // console.log("receiversChainId", receiversChainId, "chainId", chainId);
     if (receiversChainId != chainId) {
+      console.log("cross chain");
+      console.log(chainId);
+      console.log(receiversChainId);
       return true;
     } else {
+      console.log("same chain");
       return false;
     }
   };
@@ -244,6 +242,7 @@ export default function NewPostTab() {
                 setChainName={setChainName}
                 chainName={chainName}
                 SetReceiversChainId={SetReceiversChainId}
+                currentChainId={chainId}
               />
             </div>
           </div>

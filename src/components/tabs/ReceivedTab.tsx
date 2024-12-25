@@ -8,14 +8,11 @@ import {
   Wallet,
   Loader2,
   CheckCircle,
-  ExternalLink,
   Play,
 } from "lucide-react";
 
 import contractABI from "@/usdc.json";
-import { initializeClient } from "@/app/utils/publicClient";
-import { getChainId } from "@wagmi/core";
-import { config } from "@/app/utils/config";
+import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
 import {
   getContractAddress,
   getEtherscanBaseUrl,
@@ -26,28 +23,15 @@ const ReceivedTab: React.FC = () => {
   const { writeContractAsync } = useWriteContract();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [chainId, setChainId] = useState<number>(0);
   const [isParticipating, setIsParticipating] = useState<boolean>(false);
   const [processingId, setProcessingId] = useState<string>("");
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const clientRef = useRef<PublicClient | null>(null);
   const [activeTab, setActiveTab] = useState<"pending" | "executed">("pending");
 
   const pendingTransactions = transactions.filter((tx) => !tx.executed);
   const executedTransactions = transactions.filter((tx) => tx.executed);
   useEffect(() => {
-    const setupClient = async () => {
-      try {
-        const currentChainId = getChainId(config);
-        setChainId(currentChainId);
-        const newClient = initializeClient(currentChainId);
-        clientRef.current = newClient as PublicClient;
-      } catch (error) {
-        console.error("Error initializing client:", error);
-      }
-    };
-
-    setupClient();
     const fetchTransactions = async () => {
       try {
         const response = await fetch(`api/transactions?receiver=${address}`);
@@ -65,6 +49,14 @@ const ReceivedTab: React.FC = () => {
 
     fetchTransactions();
   }, [address]);
+
+  useEffect(() => {
+    if (chainId) {
+      console.log(chainId);
+      const newClient = initializeClient(chainId as AllowedChainIds);
+      clientRef.current = newClient as PublicClient;
+    }
+  }, [chainId]);
 
   const handleTransfer = async (
     from: string,
@@ -95,7 +87,9 @@ const ReceivedTab: React.FC = () => {
       }
       setIsParticipating(true);
       const tx = await writeContractAsync({
-        address: (await getContractAddress(chainId)) as Address,
+        address: (await getContractAddress(
+          chainId as AllowedChainIds
+        )) as Address,
         account: address,
         abi: contractABI,
         functionName: "transferWithAuthorization",

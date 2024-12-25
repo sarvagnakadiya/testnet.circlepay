@@ -6,10 +6,11 @@ import React, { useState } from "react";
 interface SelectWithIconsProps {
   chainName: string;
   SetReceiversChainId: React.Dispatch<React.SetStateAction<number>>;
-  setChainName: React.Dispatch<React.SetStateAction<string>>; // Prop to set the selected chain name
+  setChainName: React.Dispatch<React.SetStateAction<string>>;
+  currentChainId?: number;
 }
 
-const chains = [
+const baseChains = [
   {
     id: "baseSepolia",
     name: "Base Sepolia",
@@ -40,8 +41,17 @@ const SelectWithIcons: React.FC<SelectWithIconsProps> = ({
   chainName,
   setChainName,
   SetReceiversChainId,
+  currentChainId,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  const chains = React.useMemo(() => {
+    return [...baseChains].sort((a, b) => {
+      if (a.chainId === currentChainId) return -1;
+      if (b.chainId === currentChainId) return 1;
+      return 0;
+    });
+  }, [currentChainId]);
 
   const selectedChain =
     chains.find((chain) => chain.id === chainName) || chains[0];
@@ -50,6 +60,12 @@ const SelectWithIcons: React.FC<SelectWithIconsProps> = ({
     setChainName(chain);
     SetReceiversChainId(chainId);
     setIsOpen(false);
+  };
+
+  const getChainDisplayName = (chain: (typeof chains)[0]) => {
+    return `${chain.name}${
+      chain.chainId === currentChainId ? " (same chain)" : ""
+    }`;
   };
 
   return (
@@ -71,7 +87,9 @@ const SelectWithIcons: React.FC<SelectWithIconsProps> = ({
               width={24}
               height={24}
             />
-            <span className="text-black">{selectedChain.name}</span>
+            <span className="text-black">
+              {getChainDisplayName(selectedChain)}
+            </span>
           </div>
           <ChevronDown className="h-5 w-5 text-gray-400" />
         </button>
@@ -91,7 +109,7 @@ const SelectWithIcons: React.FC<SelectWithIconsProps> = ({
                   width={24}
                   height={24}
                 />
-                <span className="text-black">{chain.name}</span>
+                <span className="text-black">{getChainDisplayName(chain)}</span>
               </button>
             ))}
           </div>

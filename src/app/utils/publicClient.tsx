@@ -21,7 +21,7 @@ export const local = {
 } as const satisfies Chain;
 
 // Define a union type of allowed chain IDs
-type AllowedChainIds =
+export type AllowedChainIds =
   | typeof sepolia.id
   | typeof baseSepolia.id
   | typeof arbitrumSepolia.id

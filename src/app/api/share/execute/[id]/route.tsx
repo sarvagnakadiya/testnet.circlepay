@@ -70,20 +70,29 @@ app.transaction("/execute/:id", async (c) => {
   if (txObj.chaidId == txObj.destinationChainId) {
     // same chain
     console.log("same chain tx");
+    console.log(
+      txObj.sender,
+      txObj.receiver,
+      txObj.amount,
+      txObj.validAfter,
+      txObj.validBefore,
+      txObj.nonce,
+      txObj.sign
+    );
     return c.contract({
-      abi: [
-        {
-          inputs: [{ type: "uint256", name: "num" }],
-          name: "store",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
+      abi: usdcAbi,
+      chainId: "eip155:84532",
+      functionName: "transferWithAuthorization",
+      args: [
+        txObj.sender,
+        txObj.receiver,
+        txObj.amount,
+        txObj.validAfter,
+        txObj.validBefore,
+        pad(validateAddress(txObj.nonce.toString())),
+        txObj.sign,
       ],
-      chainId: chainEip as (typeof allowedChainIds)[number],
-      functionName: "store",
-      args: [BigInt(5)],
-      to: contractAddress as Address,
+      to: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
     });
   } else {
     // cross chain
@@ -106,22 +115,6 @@ app.transaction("/execute/:id", async (c) => {
       to: contractAddress as Address,
     });
   }
-  // Contract transaction response.
-  // return c.contract({
-  //   abi: usdcAbi,
-  //   chainId: chainEip as (typeof allowedChainIds)[number],
-  //   functionName: "transferWithAuthorization",
-  //   args: [
-  //     txObj.sender,
-  //     txObj.receiver,
-  //     txObj.amount,
-  //     txObj.validAfter,
-  //     txObj.validBefore,
-  //     pad(validateAddress(txObj.nonce.toString())),
-  //     txObj.sign,
-  //   ],
-  //   to: contractAddress as Address,
-  // });
 });
 
 export const GET = handle(app);

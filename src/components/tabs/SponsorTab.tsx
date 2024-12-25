@@ -11,9 +11,8 @@ import {
 } from "lucide-react";
 import contractABI from "@/usdc.json";
 import circlePayABI from "@/CirclePay.json";
-import { initializeClient } from "@/app/utils/publicClient";
-import { getChainId } from "@wagmi/core";
-import { config } from "@/app/utils/config";
+import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
+
 import {
   CIRCLEPAY_BASE,
   getContractAddress,
@@ -32,26 +31,12 @@ const SponsorTab: React.FC<SponsorTabProps> = ({ setActiveTab }) => {
   >([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [chainId, setChainId] = useState<number>(0);
   const [isParticipating, setIsParticipating] = useState<boolean>(false);
   const [processingId, setProcessingId] = useState<string>("");
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const clientRef = useRef<PublicClient | null>(null);
-  const [blockScoutUrl, setblockScoutUrl] = useState("");
 
   useEffect(() => {
-    const setupClient = async () => {
-      try {
-        const currentChainId = getChainId(config);
-        setChainId(currentChainId);
-        const newClient = initializeClient(currentChainId);
-        clientRef.current = newClient as PublicClient;
-      } catch (error) {
-        console.error("Error initializing client:", error);
-      }
-    };
-
-    setupClient();
     const fetchTransactions = async () => {
       try {
         const response = await fetch("/api/transactions?status=false");
@@ -71,6 +56,14 @@ const SponsorTab: React.FC<SponsorTabProps> = ({ setActiveTab }) => {
 
     fetchTransactions();
   }, []);
+
+  useEffect(() => {
+    if (chainId) {
+      console.log(chainId);
+      const newClient = initializeClient(chainId as AllowedChainIds);
+      clientRef.current = newClient as PublicClient;
+    }
+  }, [chainId]);
 
   useEffect(() => {
     const lowercasedTerm = searchTerm.toLowerCase();
@@ -118,7 +111,9 @@ const SponsorTab: React.FC<SponsorTabProps> = ({ setActiveTab }) => {
       setIsParticipating(true);
 
       const tx = await writeContractAsync({
-        address: (await getContractAddress(chainId)) as Address,
+        address: (await getContractAddress(
+          chainId as AllowedChainIds
+        )) as Address,
         account: address,
         abi: contractABI,
         functionName: "transferWithAuthorization",

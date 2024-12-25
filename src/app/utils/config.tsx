@@ -1,14 +1,19 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import {
   sepolia,
   baseSepolia,
   arbitrumSepolia,
   optimismSepolia,
 } from "@wagmi/core/chains";
+import { http } from "viem";
+import { createConfig } from "wagmi";
 
-export const config = getDefaultConfig({
+export const config = createConfig({
   chains: [sepolia, baseSepolia, arbitrumSepolia, optimismSepolia],
-  appName: "RainbowKit demo",
-  projectId: "8a002f09d4fc6fba7c4cd6d06df5e19f",
+  transports: {
+    [sepolia.id]: http(),
+    [baseSepolia.id]: http(),
+    [arbitrumSepolia.id]: http(),
+    [optimismSepolia.id]: http(),
+  },
   ssr: true,
 });
