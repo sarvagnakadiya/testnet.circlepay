@@ -2,10 +2,6 @@
 import { Button, Frog, TextInput } from "frog";
 import { handle } from "frog/next";
 import { MongoClient, ObjectId } from "mongodb";
-import usdcAbi from "@/usdc.json";
-import circlePayAbi from "@/CirclePay.json";
-import { Address, pad } from "viem";
-import { getContractAddress } from "@/app/utils/contractAddresses";
 
 // MongoDB connection
 const uri =
