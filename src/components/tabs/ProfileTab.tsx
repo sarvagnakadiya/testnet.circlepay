@@ -1,21 +1,35 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useAccount } from "wagmi";
+import { PublicClient } from "viem";
+import { Clock, Wallet, Copy, CheckCircle } from "lucide-react";
 import { Transaction } from "@/types/transaction";
-import {
-  ArrowRight,
-  CheckCircle,
-  Clock,
-  Wallet,
-  Copy,
-  Play,
-} from "lucide-react";
 import blockies from "blockies-ts";
+import TransactionCard from "@/components/shared/TransactionCard";
+import { useTransactionExecution } from "@/hooks/useTransactionExecution";
+import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
 
 const ProfileTab: React.FC = () => {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [filter, setFilter] = useState<"all" | "pending" | "executed">("all");
+  const [isParticipating, setIsParticipating] = useState<boolean>(false);
+  const [processingId, setProcessingId] = useState<string>("");
+  const [copied, setCopied] = useState(false);
+  const clientRef = useRef<PublicClient | null>(null);
+
+  const { handleExecute } = useTransactionExecution({
+    setIsParticipating,
+    setProcessingId,
+    clientRef,
+  });
+
+  useEffect(() => {
+    if (chainId) {
+      const newClient = initializeClient(chainId as AllowedChainIds);
+      clientRef.current = newClient as PublicClient;
+    }
+  }, [chainId]);
 
   const fetchUserTransactions = async () => {
     setLoading(true);
@@ -36,25 +50,21 @@ const ProfileTab: React.FC = () => {
     if (address) fetchUserTransactions();
   }, [address]);
 
-  const formatAmount = (amount: string | number) => {
-    return (Number(amount) / 1_000_000).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
-
   const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    if (!address) return "N/A";
+    const first = address.substring(0, 6);
+    const last = address.slice(-4);
+    return `${first}...${last}`;
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(address || "");
-    alert("Address copied to clipboard!");
-  };
-
-  const handleExecuteTransaction = (transactionId: string) => {
-    // Placeholder for executing the transaction
-    console.log("Executing transaction:", transactionId);
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(address || "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy address:", err);
+    }
   };
 
   const filteredTransactions =
@@ -72,7 +82,7 @@ const ProfileTab: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header Section */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
               Your Transactions
@@ -81,31 +91,43 @@ const ProfileTab: React.FC = () => {
               View and manage your past transactions
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full"
-              onClick={() => setFilter("pending")}
-            >
-              <Clock className="w-5 h-5" />
-              <span className="font-medium">
-                {transactions.filter((tx) => !tx.executed).length} Pending
-              </span>
-            </button>
-            <button
-              className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full"
-              onClick={() => setFilter("executed")}
-            >
-              <CheckCircle className="w-5 h-5" />
-              <span className="font-medium">
-                {transactions.filter((tx) => tx.executed).length} Executed
-              </span>
-            </button>
-            <button
-              className="flex items-center gap-2 bg-gray-50 text-gray-700 px-4 py-2 rounded-full"
-              onClick={() => setFilter("all")}
-            >
-              <span className="font-medium">Show All</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              {
+                id: "all",
+                label: "All",
+                count: transactions.length,
+                className: "bg-gray-50 text-gray-700 hover:bg-gray-100",
+              },
+              {
+                id: "pending",
+                label: "Pending",
+                count: transactions.filter((tx) => !tx.executed).length,
+                icon: <Clock className="w-5 h-5" />,
+                className: "bg-blue-50 text-blue-700 hover:bg-blue-100",
+              },
+              {
+                id: "executed",
+                label: "Executed",
+                count: transactions.filter((tx) => tx.executed).length,
+                icon: <CheckCircle className="w-5 h-5" />,
+                className: "bg-green-50 text-green-700 hover:bg-green-100",
+              },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setFilter(item.id as any)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all
+                  ${item.className}
+                  ${filter === item.id ? "ring-2 ring-offset-2" : ""}
+                `}
+              >
+                {item.icon}
+                <span className="font-medium">
+                  {item.count} {item.label}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -123,8 +145,16 @@ const ProfileTab: React.FC = () => {
                 <code className="font-mono font-medium text-gray-900">
                   {formatAddress(address || "")}
                 </code>
-                <button onClick={copyToClipboard} className="text-blue-500">
-                  <Copy className="w-5 h-5" />
+                <button
+                  onClick={copyToClipboard}
+                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  title="Copy address"
+                >
+                  {copied ? (
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-gray-400" />
+                  )}
                 </button>
               </div>
             </div>
@@ -143,8 +173,8 @@ const ProfileTab: React.FC = () => {
 
         {/* Transaction List */}
         {loading ? (
-          <div className="text-center text-gray-500">
-            Loading transactions...
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           </div>
         ) : filteredTransactions.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-16 text-center">
@@ -153,7 +183,7 @@ const ProfileTab: React.FC = () => {
               No Transactions Found
             </h3>
             <p className="text-gray-500">
-              You havent initiated or received any transactions yet.
+              You haven't initiated or received any transactions yet.
             </p>
           </div>
         ) : (
@@ -162,102 +192,15 @@ const ProfileTab: React.FC = () => {
               .slice()
               .reverse()
               .map((transaction) => (
-                <div
+                <TransactionCard
                   key={transaction._id}
-                  className="bg-white rounded-xl shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md"
-                >
-                  <div className="p-6 space-y-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                          Chain ID: {transaction.chainId}
-                        </span>
-                        {transaction.executed && (
-                          <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-                            <CheckCircle className="w-4 h-4" />
-                            Executed
-                          </span>
-                        )}
-                      </div>
-                      <time className="text-sm text-gray-500">
-                        {new Date(
-                          transaction.initiateDate
-                        ).toLocaleDateString()}{" "}
-                        at{" "}
-                        {new Date(
-                          transaction.initiateDate
-                        ).toLocaleTimeString()}
-                      </time>
-                    </div>
-
-                    {/* Transaction Details */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-white p-2 rounded-full shadow-sm">
-                            <Wallet className="w-5 h-5 text-gray-500" />
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">From</p>
-                            <div className="flex items-center gap-2">
-                              <code className="font-mono font-medium text-gray-900">
-                                {formatAddress(transaction.sender)}
-                              </code>
-                              {transaction.sender === address && (
-                                <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs">
-                                  You
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <ArrowRight className="w-5 h-5 text-gray-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">To</p>
-                          <div className="flex items-center gap-2">
-                            <code className="font-mono font-medium text-gray-900">
-                              {formatAddress(transaction.receiver)}
-                            </code>
-                            {transaction.receiver === address && (
-                              <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs">
-                                You
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Amount and Status */}
-                    <div className="flex justify-between items-center pt-4 border-t">
-                      <div>
-                        <p className="text-sm text-gray-500">Amount</p>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-gray-900">
-                            {formatAmount(transaction.amount)}
-                          </span>
-                          <span className="text-sm font-medium text-gray-400">
-                            USDC
-                          </span>
-                        </div>
-                      </div>
-                      {!transaction.executed && (
-                        <button
-                          onClick={() =>
-                            handleExecuteTransaction(transaction._id)
-                          }
-                          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm"
-                        >
-                          <Play className="w-5 h-5" />
-                          Execute
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  transaction={transaction}
+                  isParticipating={isParticipating}
+                  processingId={processingId}
+                  handleExecute={handleExecute}
+                  address={address}
+                  chainId={chainId}
+                />
               ))}
           </div>
         )}

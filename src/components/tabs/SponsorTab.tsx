@@ -9,15 +9,12 @@ import {
   Loader2,
   Search,
 } from "lucide-react";
-import contractABI from "@/usdc.json";
-import circlePayABI from "@/CirclePay.json";
-import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
 
-import {
-  CIRCLEPAY_BASE,
-  getContractAddress,
-} from "@/app/utils/contractAddresses";
+import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
+import { useTransactionExecution } from "@/hooks/useTransactionExecution";
+
 import { Transaction } from "@/types/transaction";
+import TransactionCard from "@/components/shared/TransactionCard";
 
 interface SponsorTabProps {
   setActiveTab: React.Dispatch<React.SetStateAction<number>>;
@@ -35,6 +32,12 @@ const SponsorTab: React.FC<SponsorTabProps> = ({ setActiveTab }) => {
   const [processingId, setProcessingId] = useState<string>("");
   const { address, isConnected, chainId } = useAccount();
   const clientRef = useRef<PublicClient | null>(null);
+
+  const { handleExecute } = useTransactionExecution({
+    setIsParticipating,
+    setProcessingId,
+    clientRef,
+  });
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -78,182 +81,6 @@ const SponsorTab: React.FC<SponsorTabProps> = ({ setActiveTab }) => {
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-  };
-
-  const handleTransfer = async (
-    from: string,
-    to: string,
-    value: string | number,
-    nonce: number,
-    sign: string,
-    validAfter: number,
-    validBefore: number,
-    transactionId: string
-  ) => {
-    console.log("same chain transfer: calling transferWithAuthorization");
-    if (!isConnected) {
-      alert("Please connect your account to participate.");
-      return;
-    }
-
-    setProcessingId(transactionId);
-    const validateAddress = (address: string): `0x${string}` => {
-      return address.startsWith("0x")
-        ? (address as `0x${string}`)
-        : (`0x${address}` as `0x${string}`);
-    };
-
-    try {
-      if (!clientRef.current) {
-        alert("Client not initialized. Please try again.");
-        return;
-      }
-      setIsParticipating(true);
-
-      const tx = await writeContractAsync({
-        address: (await getContractAddress(
-          chainId as AllowedChainIds
-        )) as Address,
-        account: address,
-        abi: contractABI,
-        functionName: "transferWithAuthorization",
-        args: [
-          from,
-          to,
-          value,
-          validAfter,
-          validBefore,
-          pad(validateAddress(nonce.toString())),
-          sign,
-        ],
-      });
-
-      const receipt = await clientRef.current.waitForTransactionReceipt({
-        hash: tx,
-      });
-
-      if (receipt) {
-        await fetch("/api/execute", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            transactionId,
-            transactionHash: receipt.transactionHash,
-          }),
-        });
-        setIsParticipating(false);
-      }
-    } catch (error) {
-      console.error("Error participating:", error);
-    } finally {
-      setIsParticipating(false);
-      setProcessingId("");
-    }
-  };
-
-  const handleCrossChainTransfer = async (
-    from: string,
-    to: string,
-    value: string | number,
-    nonce: number,
-    sign: string,
-    validAfter: number,
-    validBefore: number,
-    destinationChain: number,
-    transactionId: string
-  ) => {
-    console.log("doing crosschain");
-    if (!isConnected) {
-      alert("Please connect your account to participate.");
-      return;
-    }
-
-    setProcessingId(transactionId);
-    const validateAddress = (address: string): `0x${string}` => {
-      return address.startsWith("0x")
-        ? (address as `0x${string}`)
-        : (`0x${address}` as `0x${string}`);
-    };
-
-    try {
-      if (!clientRef.current) {
-        alert("Client not initialized. Please try again.");
-        return;
-      }
-      setIsParticipating(true);
-
-      const tx = await writeContractAsync({
-        address: CIRCLEPAY_BASE,
-        account: address,
-        abi: circlePayABI.abi,
-        functionName: "transferUsdcCrossChain",
-        args: [
-          from,
-          value,
-          validAfter,
-          validBefore,
-          pad(validateAddress(nonce.toString())),
-          sign,
-          destinationChain,
-          to,
-        ],
-      });
-
-      const receipt = await clientRef.current.waitForTransactionReceipt({
-        hash: tx,
-      });
-
-      if (receipt) {
-        await fetch("/api/execute", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            transactionId,
-            transactionHash: receipt.transactionHash,
-          }),
-        });
-        setIsParticipating(false);
-      }
-    } catch (error) {
-      console.error("Error participating:", error);
-    } finally {
-      setIsParticipating(false);
-      setProcessingId("");
-    }
-  };
-
-  // main function to call either handleTransfer(same chain) OR handleCrossChainTransfer(cross chain)
-  const handleExecute = (transaction: Transaction) => {
-    console.log(transaction.chainId);
-    console.log(transaction.destinationChain);
-    if (transaction.chainId != transaction.destinationChain) {
-      handleCrossChainTransfer(
-        transaction.sender,
-        transaction.receiver,
-        transaction.amount,
-        transaction.nonce,
-        transaction.sign,
-        transaction.validAfter,
-        transaction.validBefore,
-        transaction.destinationChain,
-        transaction._id
-      );
-    } else {
-      handleTransfer(
-        transaction.sender,
-        transaction.receiver,
-        transaction.amount,
-        transaction.nonce,
-        transaction.sign,
-        transaction.validAfter,
-        transaction.validBefore,
-        transaction._id
-      );
-    }
   };
 
   const formatAddress = (address: string) => {
@@ -342,79 +169,15 @@ const SponsorTab: React.FC<SponsorTabProps> = ({ setActiveTab }) => {
               .slice()
               .reverse()
               .map((transaction) => (
-                <div
+                <TransactionCard
                   key={transaction._id}
-                  className={`bg-white rounded-xl shadow-sm overflow-hidden transition-all duration-200
-                    ${
-                      processingId === transaction._id
-                        ? "ring-2 ring-blue-500"
-                        : "hover:shadow-md"
-                    }`}
-                >
-                  <div className="p-6 space-y-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                      <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                        {transaction.chainId}
-                      </span>
-                      <ArrowRight className="text-gray-400" />
-
-                      <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                        {transaction.destinationChain}
-                      </span>
-                      <time className="text-sm text-gray-500">
-                        {new Date(
-                          transaction.initiateDate
-                        ).toLocaleDateString()}{" "}
-                        at{" "}
-                        {new Date(
-                          transaction.initiateDate
-                        ).toLocaleTimeString()}
-                      </time>
-                    </div>
-
-                    {/* Transaction Details */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="text-xs text-gray-500 font-medium">
-                            From
-                          </div>
-                          <div className="font-semibold text-gray-800">
-                            {formatAddress(transaction.sender)}
-                          </div>
-                        </div>
-                        <ArrowRight className="text-gray-400" />
-                        <div className="flex items-center gap-3">
-                          <div className="text-xs text-gray-500 font-medium">
-                            To
-                          </div>
-                          <div className="font-semibold text-gray-800">
-                            {formatAddress(transaction.receiver)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right mt-2 font-bold text-blue-700">
-                        {formatAmount(transaction.amount)} USDC
-                      </div>
-                    </div>
-
-                    {/* Execute Button */}
-                    <button
-                      onClick={() => handleExecute(transaction)}
-                      disabled={
-                        processingId === transaction._id || isParticipating
-                      }
-                      className="w-full text-white bg-blue-600 hover:bg-blue-700 transition-all py-2 px-4 rounded-lg font-semibold"
-                    >
-                      {processingId === transaction._id ? (
-                        <Loader2 className="animate-spin w-5 h-5 mx-auto" />
-                      ) : (
-                        "Execute Transaction"
-                      )}
-                    </button>
-                  </div>
-                </div>
+                  transaction={transaction}
+                  isParticipating={isParticipating}
+                  processingId={processingId}
+                  handleExecute={handleExecute}
+                  address={address}
+                  chainId={chainId}
+                />
               ))}
           </div>
         )}

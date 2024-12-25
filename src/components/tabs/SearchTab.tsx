@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useAccount } from "wagmi";
+import { PublicClient } from "viem";
+import { Search, ArrowUpDown } from "lucide-react";
 import { Transaction } from "@/types/transaction";
-import { Search, ArrowUpDown, Copy, Check } from "lucide-react";
+import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
+import TransactionCard from "@/components/shared/TransactionCard";
+import { useTransactionExecution } from "@/hooks/useTransactionExecution";
 
 const SearchTransactions: React.FC = () => {
-  const { address } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [sender, setSender] = useState<string>("");
@@ -13,41 +17,23 @@ const SearchTransactions: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<
     "all" | "executed" | "notExecuted"
   >("all");
-  const [copiedValues, setCopiedValues] = useState<{ [key: string]: boolean }>(
-    {}
-  );
+  const [isParticipating, setIsParticipating] = useState<boolean>(false);
+  const [processingId, setProcessingId] = useState<string>("");
+  const clientRef = useRef<PublicClient | null>(null);
 
-  const handleCopy = async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedValues({ ...copiedValues, [id]: true });
-      setTimeout(() => {
-        setCopiedValues((prev) => ({ ...prev, [id]: false }));
-      }, 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
+  const { handleExecute } = useTransactionExecution({
+    setIsParticipating,
+    setProcessingId,
+    clientRef,
+  });
+
+  useEffect(() => {
+    if (chainId) {
+      console.log(chainId);
+      const newClient = initializeClient(chainId as AllowedChainIds);
+      clientRef.current = newClient as PublicClient;
     }
-  };
-
-  const truncateAddress = (address: string) => {
-    if (!address) return "";
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  // Rest of the fetch and handler functions remain the same...
-
-  const CopyButton = ({ text, id }: { text: string; id: string }) => (
-    <button
-      onClick={() => handleCopy(text, id)}
-      className="ml-2 p-1 hover:bg-gray-100 rounded-md transition-colors duration-200"
-    >
-      {copiedValues[id] ? (
-        <Check className="w-4 h-4 text-green-500" />
-      ) : (
-        <Copy className="w-4 h-4 text-gray-400" />
-      )}
-    </button>
-  );
+  }, [chainId]);
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -69,6 +55,7 @@ const SearchTransactions: React.FC = () => {
       setLoading(false);
     }
   };
+
   const handleStatusChange = (status: "all" | "executed" | "notExecuted") => {
     setStatusFilter(status);
   };
@@ -101,39 +88,6 @@ const SearchTransactions: React.FC = () => {
     </div>
   );
 
-  const StatusBadge = ({ executed }: { executed: boolean }) => (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        executed ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-      }`}
-    >
-      {executed ? "Executed" : "Pending"}
-    </span>
-  );
-
-  const AddressDisplay = ({
-    address: addr,
-    label,
-    isYou,
-  }: {
-    address: string;
-    label: string;
-    isYou?: boolean;
-  }) => (
-    <div>
-      <div className="text-sm text-gray-500 mb-1">{label}</div>
-      <div className="text-sm font-medium flex items-center">
-        <span className="font-mono">{truncateAddress(addr)}</span>
-        <CopyButton text={addr} id={`${label}-${addr}`} />
-        {isYou && (
-          <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-            You
-          </span>
-        )}
-      </div>
-    </div>
-  );
-
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -156,12 +110,12 @@ const SearchTransactions: React.FC = () => {
               onChange={(e) => setReceiver(e.target.value)}
               placeholder="Enter receiver address"
             />
-            <SearchInput
+            {/* <SearchInput
               label="Initiator Address"
               value={initiator}
               onChange={(e) => setInitiator(e.target.value)}
               placeholder="Enter initiator address"
-            />
+            /> */}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
@@ -211,64 +165,17 @@ const SearchTransactions: React.FC = () => {
               <p className="text-sm">Try adjusting your search filters</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-6 md:grid-cols-2">
               {transactions.map((transaction) => (
-                <div
+                <TransactionCard
                   key={transaction._id}
-                  className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow duration-200"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <AddressDisplay
-                      address={transaction.initiator}
-                      label="Initiator"
-                      isYou={transaction.initiator === address}
-                    />
-                    <AddressDisplay
-                      address={transaction.sender}
-                      label="Sender"
-                      isYou={transaction.sender === address}
-                    />
-                    <AddressDisplay
-                      address={transaction.receiver}
-                      label="Receiver"
-                      isYou={transaction.receiver === address}
-                    />
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">Amount</div>
-                      <div className="text-sm font-medium">
-                        {transaction.amount}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">Chain ID</div>
-                      <div className="text-sm font-medium">
-                        {transaction.chainId}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">Status</div>
-                      <StatusBadge executed={transaction.executed} />
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">Nonce</div>
-                      <div className="text-sm font-medium flex items-center font-mono">
-                        {truncateAddress(transaction.nonce.toString())}
-                        <CopyButton
-                          text={transaction.nonce.toString()}
-                          id={`nonce-${transaction._id}`}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">Date</div>
-                      <div className="text-sm font-medium">
-                        {new Date(
-                          transaction.initiateDate
-                        ).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  transaction={transaction}
+                  isParticipating={isParticipating}
+                  processingId={processingId}
+                  handleExecute={handleExecute}
+                  address={address}
+                  chainId={chainId}
+                />
               ))}
             </div>
           )}

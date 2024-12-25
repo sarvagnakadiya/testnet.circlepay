@@ -33,17 +33,23 @@ const fetchTransactions = async (id: string) => {
 
 // Frame route that uses a document ID from the URL
 app.frame("/:id", async (c) => {
-  console.log("id endpoint CALLED-----------");
   const id = c.req.param();
-
   const txObj = await fetchTransactions(id.id);
-  console.log(txObj);
-  console.log("the initi", txObj.initiator);
+
+  // Encode transaction data for URL
+  const txData = Buffer.from(
+    JSON.stringify({
+      sender: txObj.sender,
+      receiver: txObj.receiver,
+      amount: txObj.amount,
+      chainId: txObj.chainId,
+      destinationChain: txObj.destinationChain,
+    })
+  ).toString("base64");
 
   return c.res({
-    image: `https://sarvagna.vercel.app/assets/1-0b86c9e7.png`,
+    image: `${process.env.NEXT_PUBLIC_BASE_URL}/api/generateImage?id=${id.id}`,
     intents: [
-      // eslint-disable-next-line react/jsx-key
       <Button.Transaction target={`/execute/${id.id}`}>
         Execute
       </Button.Transaction>,
