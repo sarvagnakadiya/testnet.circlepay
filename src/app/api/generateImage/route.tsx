@@ -29,11 +29,12 @@ export async function GET(request: NextRequest) {
       `${address.slice(0, 6)}...${address.slice(-4)}`;
 
     // Chain images with absolute URLs
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.url;
     const chainImages: { [key: string]: string } = {
-      "11155111": new URL("/images/ethereum.svg", request.url).toString(),
-      "80001": new URL("/images/polygon.svg", request.url).toString(),
-      "421614": new URL("/images/arbitrum.svg", request.url).toString(),
-      "84532": new URL("/images/base.svg", request.url).toString(),
+      "11155111": new URL("/images/ethereum.svg", baseUrl).toString(),
+      "80001": new URL("/images/polygon.svg", baseUrl).toString(),
+      "421614": new URL("/images/arbitrum.svg", baseUrl).toString(),
+      "84532": new URL("/images/base.svg", baseUrl).toString(),
     };
 
     // Fetch all required images first
