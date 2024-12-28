@@ -127,7 +127,7 @@ export const useTransactionExecution = ({
         return;
       }
 
-      const circlePay = getCirclePayAddress(chainId as number);
+      const circlePay = await getCirclePayAddress(chainId as number);
       if (!circlePay) {
         throw new Error("CirclePay contract not found for this chain");
       }
