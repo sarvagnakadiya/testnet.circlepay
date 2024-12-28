@@ -71,7 +71,7 @@ app.transaction("/execute/:id", async (c) => {
     throw new Error(`Invalid chain ID: ${chainEip}`);
   }
 
-  if (txObj.chaidId == txObj.destinationChainId) {
+  if (txObj.chaidId == txObj.destinationChain) {
     // same chain
     console.log("same chain tx");
     console.log(
