@@ -128,7 +128,7 @@ export default function NewPostTab() {
     try {
       const theNonce = await generateNonce();
       const validTo = validateAddress(to);
-      const circlePay = getCirclePayAddress(chainId);
+      const circlePay = await getCirclePayAddress(chainId);
 
       if (!circlePay) {
         throw new Error("CirclePay contract not found for this chain");
@@ -166,7 +166,7 @@ export default function NewPostTab() {
         primaryType: "TransferWithAuthorization",
         message: {
           from: address as `0x${string}`,
-          to: isCrossChain() ? (circlePay as `0x${string}`) : validTo,
+          to: isCrossChain() ? (circlePay as Address) : validTo,
           value: valueBigInt,
           validAfter: validAfterTimestamp,
           validBefore: validBeforeTimestamp,
