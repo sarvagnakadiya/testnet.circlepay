@@ -32,22 +32,16 @@ export async function GET(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.url;
     const chainImages: { [key: string]: string } = {
       "11155111": new URL("/images/ethereum.svg", baseUrl).toString(),
-      "80001": new URL("/images/polygon.svg", baseUrl).toString(),
+      "11155420": new URL("/images/optimism.svg", baseUrl).toString(),
       "421614": new URL("/images/arbitrum.svg", baseUrl).toString(),
       "84532": new URL("/images/base.svg", baseUrl).toString(),
     };
 
     // Fetch all required images first
-    const sourceChainImage = await fetch(chainImages[params.chainId])
-      .then((res) => res.arrayBuffer())
-      .then(
-        (buffer) =>
-          `data:image/svg+xml;base64,${Buffer.from(buffer).toString("base64")}`
-      );
+    let sourceChainImage, destinationChainImage;
 
-    let destinationChainImage;
-    if (params.chainId !== params.destinationChain) {
-      destinationChainImage = await fetch(chainImages[params.destinationChain])
+    try {
+      sourceChainImage = await fetch(chainImages[params.chainId])
         .then((res) => res.arrayBuffer())
         .then(
           (buffer) =>
@@ -55,6 +49,26 @@ export async function GET(request: NextRequest) {
               "base64"
             )}`
         );
+
+      // Only fetch destination chain image if it's different and exists
+      if (
+        params.chainId !== params.destinationChain &&
+        chainImages[params.destinationChain]
+      ) {
+        destinationChainImage = await fetch(
+          chainImages[params.destinationChain]
+        )
+          .then((res) => res.arrayBuffer())
+          .then(
+            (buffer) =>
+              `data:image/svg+xml;base64,${Buffer.from(buffer).toString(
+                "base64"
+              )}`
+          );
+      }
+    } catch (error) {
+      console.error("Error fetching chain images:", error);
+      // Continue without images if there's an error
     }
 
     const imageResponse = new ImageResponse(

@@ -1,14 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useAccount, useWriteContract } from "wagmi";
-import { Address, pad, PublicClient } from "viem";
-import {
-  CheckCircle2,
-  ArrowRight,
-  Clock,
-  Wallet,
-  Loader2,
-  Search,
-} from "lucide-react";
+import { PublicClient } from "viem";
+import { CheckCircle2, Clock, Wallet, Loader2, Search } from "lucide-react";
 
 import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
 import { useTransactionExecution } from "@/hooks/useTransactionExecution";
@@ -21,7 +14,6 @@ interface SponsorTabProps {
 }
 
 const SponsorTab: React.FC<SponsorTabProps> = ({ setActiveTab }) => {
-  const { writeContractAsync } = useWriteContract();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<
     Transaction[]

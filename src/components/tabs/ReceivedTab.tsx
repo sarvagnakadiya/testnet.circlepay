@@ -1,31 +1,13 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useAccount, useWriteContract } from "wagmi";
-import { Address, pad, PublicClient } from "viem";
-import {
-  CheckCircle2,
-  ArrowRight,
-  Clock,
-  Wallet,
-  Loader2,
-  CheckCircle,
-  Play,
-  Share2,
-} from "lucide-react";
-
-import contractABI from "@/usdc.json";
+import { useAccount } from "wagmi";
+import { PublicClient } from "viem";
+import { CheckCircle2, Clock, Wallet, CheckCircle } from "lucide-react";
 import { AllowedChainIds, initializeClient } from "@/app/utils/publicClient";
-import {
-  getContractAddress,
-  getEtherscanBaseUrl,
-} from "@/app/utils/contractAddresses";
 import { Transaction } from "@/types/transaction";
-import circlePayABI from "@/CirclePay.json";
-import { CIRCLEPAY_BASE } from "@/app/utils/contractAddresses";
 import TransactionCard from "@/components/shared/TransactionCard";
 import { useTransactionExecution } from "@/hooks/useTransactionExecution";
 
 const ReceivedTab: React.FC = () => {
-  const { writeContractAsync } = useWriteContract();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isParticipating, setIsParticipating] = useState<boolean>(false);

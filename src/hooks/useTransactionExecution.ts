@@ -1,12 +1,11 @@
 import { useAccount, useWriteContract } from "wagmi";
 import { Address, pad, PublicClient } from "viem";
-import { useRef } from "react";
 import { AllowedChainIds } from "@/app/utils/publicClient";
 import contractABI from "@/usdc.json";
 import circlePayABI from "@/CirclePay.json";
 import {
-  CIRCLEPAY_BASE,
   getContractAddress,
+  getCirclePayAddress,
 } from "@/app/utils/contractAddresses";
 import { Transaction } from "@/types/transaction";
 
@@ -127,10 +126,16 @@ export const useTransactionExecution = ({
         alert("Client not initialized. Please try again.");
         return;
       }
+
+      const circlePay = getCirclePayAddress(chainId as number);
+      if (!circlePay) {
+        throw new Error("CirclePay contract not found for this chain");
+      }
+
       setIsParticipating(true);
 
       const tx = await writeContractAsync({
-        address: CIRCLEPAY_BASE,
+        address: circlePay as Address,
         account: address,
         abi: circlePayABI.abi,
         functionName: "transferUsdcCrossChain",

@@ -6,6 +6,7 @@ import {
   keccak256,
   PublicClient,
   formatUnits,
+  isAddress,
 } from "viem";
 import { signTypedData, getChainId, readContract } from "@wagmi/core";
 import { config } from "@/app/utils/config";
@@ -14,16 +15,9 @@ import { useAccount } from "wagmi";
 import axios from "axios";
 import {
   getContractAddress,
-  CIRCLEPAY_BASE,
+  getCirclePayAddress,
 } from "@/app/utils/contractAddresses";
-import {
-  Calendar,
-  Info,
-  Wallet,
-  ArrowRight,
-  Network,
-  Send,
-} from "lucide-react";
+import { Calendar, Info, Wallet, ArrowRight } from "lucide-react";
 import SelectWithIcons from "./SelectWithIcons";
 import usdcABI from "@/usdc.json";
 
@@ -134,6 +128,11 @@ export default function NewPostTab() {
     try {
       const theNonce = await generateNonce();
       const validTo = validateAddress(to);
+      const circlePay = getCirclePayAddress(chainId);
+
+      if (!circlePay) {
+        throw new Error("CirclePay contract not found for this chain");
+      }
 
       const valueBigInt = BigInt(Math.round(Number(value) * 1_000_000));
       const validAfterTimestamp = isValidAfterZero
@@ -167,7 +166,7 @@ export default function NewPostTab() {
         primaryType: "TransferWithAuthorization",
         message: {
           from: address as `0x${string}`,
-          to: isCrossChain() ? CIRCLEPAY_BASE : validTo,
+          to: isCrossChain() ? (circlePay as `0x${string}`) : validTo,
           value: valueBigInt,
           validAfter: validAfterTimestamp,
           validBefore: validBeforeTimestamp,
@@ -215,7 +214,8 @@ export default function NewPostTab() {
 
   // Validation functions for each step
   const isStep1Valid = () => {
-    return address && to.trim() !== "";
+    // Check if address is connected and 'to' address is valid
+    return address && isAddress(to.trim());
   };
 
   const isStep2Valid = () => {
@@ -271,12 +271,21 @@ export default function NewPostTab() {
                 <Wallet className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type="text"
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                    to && !isAddress(to.trim())
+                      ? "border-red-500"
+                      : "border-gray-300"
+                  }`}
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
                   placeholder="0x..."
                 />
               </div>
+              {to && !isAddress(to.trim()) && (
+                <p className="text-sm text-red-500">
+                  Please enter a valid Ethereum address
+                </p>
+              )}
             </div>
             <div className="relative">
               <SelectWithIcons

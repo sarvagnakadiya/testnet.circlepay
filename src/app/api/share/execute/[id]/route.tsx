@@ -1,11 +1,14 @@
 /** @jsxImportSource frog/jsx */
-import { Button, Frog, TextInput } from "frog";
+import { Frog } from "frog";
 import { handle } from "frog/next";
 import { MongoClient, ObjectId } from "mongodb";
 import usdcAbi from "@/usdc.json";
 import circlePayAbi from "@/CirclePay.json";
 import { Address, pad } from "viem";
-import { getContractAddress } from "@/app/utils/contractAddresses";
+import {
+  getContractAddress,
+  getCirclePayAddress,
+} from "@/app/utils/contractAddresses";
 
 // MongoDB connection
 const uri =
@@ -45,6 +48,7 @@ app.transaction("/execute/:id", async (c) => {
   console.log(txObj);
   console.log("the initi", txObj.initiator);
   const contractAddress = await getContractAddress(txObj.chainId);
+  const circlePayAddress = await getCirclePayAddress(txObj.chainId);
 
   const chainEip = `eip155:${txObj.chainId}`;
   const allowedChainIds = [
@@ -81,7 +85,7 @@ app.transaction("/execute/:id", async (c) => {
     );
     return c.contract({
       abi: usdcAbi,
-      chainId: "eip155:84532",
+      chainId: chainEip as (typeof allowedChainIds)[number],
       functionName: "transferWithAuthorization",
       args: [
         txObj.sender,
@@ -92,7 +96,7 @@ app.transaction("/execute/:id", async (c) => {
         pad(validateAddress(txObj.nonce.toString())),
         txObj.sign,
       ],
-      to: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      to: contractAddress as Address,
     });
   } else {
     // cross chain
@@ -112,7 +116,7 @@ app.transaction("/execute/:id", async (c) => {
         txObj.destinationChain,
         txObj.receiver,
       ],
-      to: contractAddress as Address,
+      to: circlePayAddress as Address,
     });
   }
 });
